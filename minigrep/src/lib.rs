@@ -1,4 +1,5 @@
 use std::fs;
+use std::env;
 use std::error::Error;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
@@ -6,18 +7,23 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 
     let content = fs::read_to_string(&config.filename)?;
 
-    for line in search(&config.query, &content) {
+    for line in search(&config.query, &content, config.case_sensitive) {
         println!("{}", line);
     }
 
     Ok(())
 }
 
-fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
+fn search<'a>(query: &str, content: &'a str, case_sensitive: bool) -> Vec<&'a str> {
+    let query_to_use = if case_sensitive {
+        query.to_string()
+    } else{
+        query.to_lowercase()
+    };
     let lines = content.lines();
     let mut result = Vec::new();
     for line in lines {
-        if line.contains(query) {
+        if (!case_sensitive && line.to_lowercase().contains(&query_to_use)) || line.contains(&query_to_use) {
             result.push(line);
         }
     }
@@ -26,7 +32,8 @@ fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
 
 pub struct Config {
     query: String,
-    filename: String
+    filename: String,
+    case_sensitive: bool
 }
 
 impl Config {
@@ -37,7 +44,8 @@ impl Config {
 
         Ok(Config {
             query: args[1].clone(),
-            filename: args[2].clone()
+            filename: args[2].clone(),
+            case_sensitive: env::var("CASE_INSENSITIVE").is_err()
         })
     }
 }
@@ -47,15 +55,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn one_result() {
+    fn search_case_sensitive() {
         let query = "duct";
         let content = "\
 Rust
 safe, fast, productive.
-Pick three.";
+Pick three.
+DUCT";
         assert_eq!(
           vec!("safe, fast, productive."),
-          search(query, content)
+          search(query, content, true)
+        );
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let query = "duct";
+        let content = "\
+Rust
+safe, fast, productive.
+Pick three.
+DUCT";
+        assert_eq!(
+          vec!("safe, fast, productive.", "DUCT"),
+          search(query, content, false)
         );
     }
 
