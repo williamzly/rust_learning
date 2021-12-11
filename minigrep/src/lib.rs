@@ -42,10 +42,14 @@ impl Config {
             return Err("Please at least provide 2 arguments");
         }
 
+        let mut case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        if args.len() > 3 {
+            case_sensitive = args[3] == "true";
+        }
         Ok(Config {
             query: args[1].clone(),
             filename: args[2].clone(),
-            case_sensitive: env::var("CASE_INSENSITIVE").is_err()
+            case_sensitive
         })
     }
 }
