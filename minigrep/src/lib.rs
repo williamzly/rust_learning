@@ -1,5 +1,6 @@
 use std::fs;
 use std::env;
+use std::env::Args;
 use std::error::Error;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
@@ -37,18 +38,27 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("Please at least provide 2 arguments");
-        }
+    pub fn new(mut args: Args) -> Result<Config, &'static str> {
+        args.next();
 
-        let mut case_sensitive = env::var("CASE_INSENSITIVE").is_err();
-        if args.len() > 3 {
-            case_sensitive = args[3] == "true";
-        }
+        let query = match args.next() {
+            Some(query) => query,
+            None => { return Err("Failed to get query arg"); }
+        };
+
+        let filename = match args.next() {
+            Some(filename) => filename,
+            None => { return Err("Failed to get filename arg"); }
+        };
+
+        let case_sensitive = match args.next() {
+            Some(case_sensitive) => case_sensitive == "true",
+            None => env::var("CASE_INSENSITIVE").is_err()
+        };
+
         Ok(Config {
-            query: args[1].clone(),
-            filename: args[2].clone(),
+            query,
+            filename,
             case_sensitive
         })
     }
