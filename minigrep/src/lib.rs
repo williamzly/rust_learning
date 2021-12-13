@@ -21,14 +21,15 @@ fn search<'a>(query: &str, content: &'a str, case_sensitive: bool) -> Vec<&'a st
     } else{
         query.to_lowercase()
     };
-    let lines = content.lines();
-    let mut result = Vec::new();
-    for line in lines {
-        if (!case_sensitive && line.to_lowercase().contains(&query_to_use)) || line.contains(&query_to_use) {
-            result.push(line);
-        }
-    }
-    result
+
+
+    content.lines()
+        .filter(|line| {
+            (!case_sensitive && line.to_lowercase().contains(&query_to_use))
+            || line.contains(&query_to_use)
+        })
+        .collect()
+
 }
 
 pub struct Config {
