@@ -36,11 +36,18 @@ impl Post {
             self.state.take().unwrap().approve()
         );
     }
+
+    pub fn reject(&mut self) {
+        self.state = Some(
+            self.state.take().unwrap().reject()
+        );
+    }
 }
 
 trait State {
     fn request_review(self: Box<Self>) -> Box<dyn State>;
     fn approve(self: Box<Self>) -> Box<dyn State>;
+    fn reject(self: Box<Self>) -> Box<dyn State>;
     fn content<'a>(&self, post: &'a Post) -> &'a str {
         ""
     }
@@ -57,6 +64,9 @@ impl State for Draft {
     fn approve(self: Box<Self>) -> Box<dyn State> {
         self
     }
+    fn reject(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
 }
 
 struct PendingReview {
@@ -70,6 +80,9 @@ impl State for PendingReview {
     fn approve(self: Box<Self>) -> Box<dyn State> {
         Box::new(Published {})
     }
+    fn reject(self: Box<Self>) -> Box<dyn State> {
+        Box::new(Draft {})
+    }
 }
 
 struct Published {
@@ -81,6 +94,9 @@ impl State for Published {
         self
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+    fn reject(self: Box<Self>) -> Box<dyn State> {
         self
     }
     fn content<'a>(&self, post: &'a Post) -> &'a str {
@@ -99,4 +115,15 @@ fn main() {
     assert_eq!(post.content(), "");
     post.approve();
     assert_eq!(post.content(), "Some text...");
+
+    // test reject
+    let mut post2 = Post::new();
+    assert_eq!(post2.content(), "");
+    post2.add_content("Some text...");
+    assert_eq!(post2.content(), "");
+    post2.request_review();
+    assert_eq!(post2.content(), "");
+    post2.reject(); // back to Draft
+    post2.approve(); // nothing to do, stay Draft
+    assert_eq!(post2.content(), "");
 }
