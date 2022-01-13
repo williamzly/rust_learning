@@ -23,7 +23,9 @@ impl Post {
     }
 
     pub fn add_content(&mut self, content: &str) {
-        self.content.push_str(content);
+        if self.state.as_ref().unwrap().editable() {
+            self.content.push_str(content);
+        }
     }
 
     pub fn request_review(&mut self) {
@@ -46,6 +48,7 @@ impl Post {
 }
 
 trait State {
+    fn editable(&self) -> bool { false }
     fn request_review(self: Box<Self>) -> Box<dyn State>;
     fn approve(self: Box<Self>) -> Box<dyn State>;
     fn reject(self: Box<Self>) -> Box<dyn State>;
@@ -59,6 +62,7 @@ struct Draft {
 }
 
 impl State for Draft {
+    fn editable(&self) -> bool { true }
     fn request_review(self: Box<Self>) -> Box<dyn State> {
         Box::new(PendingReview::new())
     }
@@ -151,4 +155,14 @@ fn main() {
     post3.approve();
     post3.approve();
     assert_eq!(post3.content(), "Some text...");
+
+    // test only Draft status can be edited
+    let mut post4 = Post::new();
+    assert_eq!(post4.content(), "");
+    post4.request_review();
+    post4.add_content("Some text...");
+    assert_eq!(post4.content(), "");
+    post4.approve();
+    post4.approve();
+    assert_eq!(post4.content(), "");
 }
