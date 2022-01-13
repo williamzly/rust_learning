@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 
 struct Post {
     state: Option<Box<dyn State>>,
@@ -59,7 +60,7 @@ struct Draft {
 
 impl State for Draft {
     fn request_review(self: Box<Self>) -> Box<dyn State> {
-        Box::new(PendingReview {})
+        Box::new(PendingReview::new())
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
         self
@@ -70,7 +71,15 @@ impl State for Draft {
 }
 
 struct PendingReview {
+    approvals: RefCell<i32>
+}
 
+impl PendingReview {
+    pub fn new() -> PendingReview {
+        PendingReview {
+            approvals: RefCell::new(0)
+        }
+    }
 }
 
 impl State for PendingReview {
@@ -78,7 +87,12 @@ impl State for PendingReview {
         self
     }
     fn approve(self: Box<Self>) -> Box<dyn State> {
-        Box::new(Published {})
+        *self.approvals.borrow_mut() += 1;
+        if *self.approvals.borrow() == 2 {
+            Box::new(Published {})
+        } else {
+            self
+        }
     }
     fn reject(self: Box<Self>) -> Box<dyn State> {
         Box::new(Draft {})
@@ -114,7 +128,7 @@ fn main() {
     post.request_review();
     assert_eq!(post.content(), "");
     post.approve();
-    assert_eq!(post.content(), "Some text...");
+    assert_eq!(post.content(), "");
 
     // test reject
     let mut post2 = Post::new();
@@ -126,4 +140,15 @@ fn main() {
     post2.reject(); // back to Draft
     post2.approve(); // nothing to do, stay Draft
     assert_eq!(post2.content(), "");
+
+    // test need double approve
+    let mut post3 = Post::new();
+    assert_eq!(post3.content(), "");
+    post3.add_content("Some text...");
+    assert_eq!(post3.content(), "");
+    post3.request_review();
+    assert_eq!(post3.content(), "");
+    post3.approve();
+    post3.approve();
+    assert_eq!(post3.content(), "Some text...");
 }
