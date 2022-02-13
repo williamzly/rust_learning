@@ -20,4 +20,7 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("request: {}", String::from_utf8_lossy(&buffer[..]));
 
+    stream.write("HTTP/1.1 200 OK \r\n\r\n Hello, this msg coming from rust web server".as_bytes()).unwrap();
+    stream.flush().unwrap();
+
 }
