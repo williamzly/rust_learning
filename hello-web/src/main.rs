@@ -29,8 +29,6 @@ fn handle_connection(mut stream: TcpStream) {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).unwrap();
 
-    println!("request: {}", String::from_utf8_lossy(&buffer[..]));
-
     let (status_code, contents) = if buffer.starts_with(b"GET / HTTP/1.1") {
         ("200 OK", fs::read_to_string("hello.html").unwrap())
     } else if buffer.starts_with(b"GET /sleep HTTP/1.1") {
@@ -55,10 +53,15 @@ fn handle_connection(mut stream: TcpStream) {
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
+enum Message {
+    NewJob(Job),
+    Terminate
+}
+
 
 struct ThreadPool {
     workers: Vec<Worker>,
-    sender: Sender<Job>
+    sender: Sender<Message>
 }
 
 impl ThreadPool {
@@ -78,30 +81,56 @@ impl ThreadPool {
     }
 
     pub fn execute<T: FnOnce() + Send + 'static>(&mut self, job: T) {
-        self.sender.send(Box::new(job));
+        let job = Box::new(job);
+        self.sender.send(Message::NewJob(job)).unwrap();
+    }
+}
+
+impl Drop for ThreadPool {
+
+    fn drop(&mut self) {
+        println!("Start terminate all threads");
+        for _ in &self.workers {
+            self.sender.send(Message::Terminate).unwrap();
+        }
+        for worker in &mut self.workers {
+            if let Some(thread) = worker.thread.take(){
+                println!("Sending terminate msg to worker {}", worker.id);
+                thread.join().unwrap();
+            }
+        }
     }
 }
 
 struct Worker {
 
     id: usize,
-    join_handler: JoinHandle<()>
+    thread: Option<JoinHandle<()>>
 
 }
 
 impl Worker {
 
-    pub fn new(id: usize, receiver: Arc<Mutex<Receiver<Job>>>) -> Worker {
+    pub fn new(id: usize, receiver: Arc<Mutex<Receiver<Message>>>) -> Worker {
         Worker {
             id,
-            join_handler: thread::spawn(move || {
+            thread: Some(thread::spawn(move || {
 
                 loop {
-                    let job = receiver.lock().unwrap().recv().unwrap();
-                    println!("Worker {} got a job; executing.", id);
-                    job();
+                    let message = receiver.lock().unwrap().recv().unwrap();
+                    match message {
+                        Message::NewJob(job) => {
+                            println!("Worker {} get a job; executing.", id);
+                            job();
+                        },
+                        Message::Terminate => {
+                            println!("Worker {} is going to terminate.", id);
+                            break;
+                        }
+                    }
+
                 };
-            })
+            }))
         }
     }
 
