@@ -1,6 +1,7 @@
 use std::net::TcpListener;
 use std::net::TcpStream;
 use std::io::prelude::*;
+use std::fs;
 
 fn main() {
 
@@ -20,7 +21,15 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("request: {}", String::from_utf8_lossy(&buffer[..]));
 
-    stream.write("HTTP/1.1 200 OK \r\n\r\n Hello, this msg coming from rust web server".as_bytes()).unwrap();
+    let contents = fs::read_to_string("hello.html").unwrap();
+
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+        contents.len(),
+        contents
+    );
+
+    stream.write(response.as_bytes()).unwrap();
     stream.flush().unwrap();
 
 }
